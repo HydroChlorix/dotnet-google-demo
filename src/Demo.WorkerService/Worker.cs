@@ -8,23 +8,28 @@ namespace Demo.WorkerService
     {
         private readonly ILogger<Worker> _logger;
         private readonly IOptions<PubSubOption> _options;
+        private SubscriberClient subscriber;
 
         public Worker(ILogger<Worker> logger, IOptions<PubSubOption> options)
         {
             _logger = logger;
             _options = options;
         }
-
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        public override async Task StartAsync(CancellationToken cancellationToken)
         {
+            Console.WriteLine($"Start at {DateTimeOffset.Now}");
+
             // Pull messages from the subscription using SubscriberClient.
             SubscriptionName subscriptionName = SubscriptionName.FromProjectSubscription(_options.Value.ProjcetId, _options.Value.SubscriptionId);
-            SubscriberClient subscriber = await SubscriberClient.CreateAsync(subscriptionName);
+            subscriber = await SubscriberClient.CreateAsync(subscriptionName);
 
+            await base.StartAsync(cancellationToken);
+        }
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        {
             // Start the subscriber listening for messages.
             await subscriber.StartAsync((msg, cancellationToken) =>
             {
-
                 Console.WriteLine($"Received message {msg.MessageId} published at {msg.PublishTime.ToDateTime()}");
                 Console.WriteLine($"Text: '{msg.Data.ToStringUtf8()}'");
 
@@ -37,7 +42,14 @@ namespace Demo.WorkerService
                 return Task.FromResult(SubscriberClient.Reply.Ack);
             });
 
-            await subscriber.StopAsync(stoppingToken);
+        }
+        public override async Task StopAsync(CancellationToken cancellationToken)
+        {
+            Console.WriteLine($"Stop at {DateTimeOffset.Now}");
+
+            await subscriber.StopAsync(cancellationToken);
+
+            await base.StopAsync(cancellationToken);
         }
     }
 }
